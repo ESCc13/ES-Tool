@@ -22,3 +22,7 @@ modpc/
 ModPcGUI/pcl/
 ModPcGUI/src/PclFont.ttf
 ModPcGUI/dist/*.exe
+
+# 本地工作记录（开发笔记，不进仓库）
+.workbuddy/
+push_to_github.bat
