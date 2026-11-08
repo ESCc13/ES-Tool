@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>ModPcGUI</AssemblyName>
+    <RootNamespace>ModPcGUI</RootNamespace>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <Prefer32Bit>true</Prefer32Bit>
+    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
+    <LangVersion>14.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+    <NoWarn>CS0649;CS0169;CS0414;CS0162;CS0219;CS1998;CS4014</NoWarn>
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- PCL2 自带英文字体（PCL English），用于标题栏 Logo，1:1 还原。
+         字体是 PCL2 的内嵌资源，不进本仓库；缺了照样能编译运行（Logo 退回微软雅黑）。 -->
+    <Resource Include="PclFont.ttf" Condition="Exists('PclFont.ttf')" />
+    <!-- PclStyles.xaml 已改为运行时 XamlReader.Parse 加载（其程序集名带空格，
+         无法通过 WPF 编译期的 clr-namespace URI 校验），从 Page 自动包含里排除 -->
+    <Page Remove="PclStyles.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(MSBuildThisFileDirectory)..\..\modpc\ModPc\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="Mcl.Core">
+      <HintPath>$(MSBuildThisFileDirectory)..\..\modpc\ModPc\Mcl.Core.dll</HintPath>
+    </Reference>
+    <!-- PCL2 原生 UI 程序集：MyCard / MyButton / MyHint 等控件直接用它的。
+         注意：文件已从「Plain Craft Launcher 2.exe」改名为 PCL.Core.dll，
+         避免项目里躺着一个能双击打开 PCL2 的 exe；程序集内部标识不变，控件与资源照旧可用 -->
+    <Reference Include="Plain Craft Launcher 2">
+      <HintPath>$(MSBuildThisFileDirectory)..\pcl\PCL.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- PclStyles.xaml（PCL2 Application.Resources 全量）在 XAML 编译期需要解析
+         MeloongCore 的 Converter，故把两个 MeloongCore 也挂进引用（不随构建复制） -->
+    <Reference Include="MeloongCore.Wpf">
+      <HintPath>$(MSBuildThisFileDirectory)..\pcl\MeloongCore.Wpf.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="MeloongCore">
+      <HintPath>$(MSBuildThisFileDirectory)..\pcl\MeloongCore.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="WindowsFormsIntegration" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+  </ItemGroup>
+
+</Project>

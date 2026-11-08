@@ -1,0 +1,24 @@
+# ───────────────── 构建产物 ─────────────────
+[Bb]in/
+[Oo]bj/
+*.pdb
+*.user
+*.suo
+.vs/
+build/
+_tools/
+_pkg/
+*.zip
+
+# ───────────────── 运行时数据（含明文登录态，绝不提交）─────────────────
+user/
+ES_Tool_data/
+*.log
+
+# ───────────────── 第三方运行时 / 程序集 ─────────────────
+# 原版挂服机（modpc）运行目录和 PCL2 程序集都不属于本项目的版权物，体积又有上百 MB，
+# 一律不进仓库；构建/运行前请按 README 的「准备运行环境」自己放进去。
+modpc/
+ModPcGUI/pcl/
+ModPcGUI/src/PclFont.ttf
+ModPcGUI/dist/*.exe
