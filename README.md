@@ -3,8 +3,7 @@
 **Minecraft 中国版第三方启动器** —— 基于原版挂服机（modpc）二次开发的图形界面版本插件，协议与功能保持一致。
 界面直接使用 **PCL2（Plain Craft Launcher 2）程序集里的原生控件与完整前端资源**，不是仿制。
 
-> 纯公益开源项目，**禁止倒卖**。项目地址：<https://github.com/ESCc13/ES-Tool>
-
+> 纯公益开源项目，**禁止倒卖**。
 ![联机大厅](docs/screenshot-lobby.png)
 
 ## 这是什么
