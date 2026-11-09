@@ -1,9 +1,14 @@
 # ES Tool
 
+[![源码检查与构建](https://github.com/ESCc13/ES-Tool/actions/workflows/dotnet-desktop.yml/badge.svg)](https://github.com/ESCc13/ES-Tool/actions/workflows/dotnet-desktop.yml)
+[![License](https://img.shields.io/badge/license-ES%20Tool%20Public%20License-1370f3)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET%20Framework-4.8-512bd4)](https://dotnet.microsoft.com/)
+
 **Minecraft 中国版第三方启动器** —— 基于原版挂服机（modpc）二次开发的图形界面版本插件，协议与功能保持一致。
 界面直接使用 **PCL2（Plain Craft Launcher 2）程序集里的原生控件与完整前端资源**，不是仿制。
 
-> 纯公益开源项目，**禁止倒卖**。
+> 纯公益开源项目，**禁止倒卖**。项目地址：<https://github.com/ESCc13/ES-Tool>
+
 ![联机大厅](docs/screenshot-lobby.png)
 
 ## 这是什么
@@ -48,11 +53,14 @@ ES Tool 把它整个搬到图形界面上：**业务逻辑一条没改**，仍�
 
 ## 直接用（不编译）
 
-到 [Releases](https://github.com/ESCc13/ES-Tool/releases) 下载：
+到 [Releases](https://github.com/ESCc13/ES-Tool/releases/latest) 下载：
 
-- `ES Tool.exe` —— 单文件版，丢进任意目录双击即可，首次运行会自己释放依赖
-- 或者整个运行目录（`ModPcGUI.exe` + 依赖 DLL + `pcl\`）打包的完整包
+| 文件 | 说明 |
+|---|---|
+| `ES_Tool_v1.0.0_single.exe` | **单文件版，推荐**。丢进任意目录双击即可，首次运行自动把依赖释放到 `ES_Tool_data\`，之后按 sha256 戳跳过释放，永远不覆盖 `user\*`、`config.json`、`ui.json` |
+| `ES_Tool_v1.0.0_full.zip` | 完整运行目录（`ModPcGUI.exe` + 依赖 DLL + `pcl\` + 源码），想看源码或自己改的拿这个 |
 
+> 两个包都**不含账号数据** —— 出包前已清掉 `user\*.json`，设备指纹也换成了通用值。
 > 运行目录里必须保留原版 modpc 的 `Login.exe` 及其依赖 —— ES Tool 是外壳，登录与协议实现仍在里面。
 
 ## 从源码构建
