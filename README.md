@@ -45,12 +45,6 @@ ES Tool 把它整个搬到图形界面上：**业务逻辑一条没改**，仍�
   `modpc\ES Tool.exe` 是自解压单文件：首次运行把依赖释放到 `ES_Tool_data\`，
   之后按 sha256 戳跳过重复释放，**永远不覆盖** `user\*`、`config.json`、`ui.json`。
 
-## 截图
-
-| 联机大厅（在线地图与 IP 查询） | 设置页（配置与诊断） |
-|---|---|
-| ![联机大厅](docs/screenshot-lobby.png) | ![设置页](docs/screenshot-settings.png) |
-
 ## 直接用（不编译）
 
 到 [Releases](https://github.com/ESCc13/ES-Tool/releases/latest) 下载：
