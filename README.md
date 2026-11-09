@@ -9,7 +9,7 @@
 
 > 纯公益开源项目，**禁止倒卖**。项目地址：<https://github.com/ESCc13/ES-Tool>
 
-![联机大厅](docs/screenshot-lobby.png)
+![启动页](docs/screenshot-start.png)
 
 ## 这是什么
 
@@ -47,9 +47,9 @@ ES Tool 把它整个搬到图形界面上：**业务逻辑一条没改**，仍�
 
 ## 截图
 
-| 功能页（184 条命令） | 设置页（配置与诊断） |
+| 联机大厅（在线地图与 IP 查询） | 设置页（配置与诊断） |
 |---|---|
-| ![功能页](docs/screenshot-features.png) | ![设置页](docs/screenshot-settings.png) |
+| ![联机大厅](docs/screenshot-lobby.png) | ![设置页](docs/screenshot-settings.png) |
 
 ## 直接用（不编译）
 
