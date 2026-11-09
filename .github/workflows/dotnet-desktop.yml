@@ -26,7 +26,8 @@ jobs:
       - name: 安装 .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 8.0.x
+          # 工程用了 LangVersion 14.0（C# 14），SDK 低于 10 会直接报 CS1617
+          dotnet-version: 10.0.x
 
       - name: 源码完整性检查
         shell: bash

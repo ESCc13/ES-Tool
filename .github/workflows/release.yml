@@ -1,0 +1,225 @@
+name: 构建并发布 Release
+
+# 说明：
+#   本仓库只放 ES Tool 自己的源码，pcl\（PCL2 程序集）和 modpc\（原版挂服机运行目录）
+#   都不在仓库里，所以无法从零编译。本流水线复用已有的发行版 full.zip 当「依赖底座」：
+#     1) 从底座里取 pcl\*.dll 补 ModPcGUI/pcl\，取 modpc 下的 Newtonsoft.Json/Mcl.Core 补 modpc/ModPc\
+#     2) 正常编译 Release
+#     3) 把底座当运行目录，用新编译的 ModPcGUI.exe 覆盖进去，重新打 zip
+#   单文件版（_single.exe）由本项目的自解压打包器生成，打包器不在本仓库，因此 CI 只产出完整包。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "发布标签，如 v1.1.0（不存在时会基于当前提交创建）"
+        required: true
+      prerelease:
+        description: "标记为预发布（不设为 Latest）"
+        type: boolean
+        default: false
+      draft:
+        description: "存为草稿，先不上架"
+        type: boolean
+        default: false
+      deps_tag:
+        description: "依赖底座所用的发行版标签（必须带 *_full.zip）"
+        required: false
+        default: "v1.0.0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          # 工程用了 LangVersion 14.0（C# 14），SDK 低于 10 会直接报 CS1617
+          dotnet-version: "10.0.x"
+
+      - name: 解析版本号
+        id: ver
+        shell: pwsh
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          $tag = if ($env:EVENT -eq 'push') { $env:GITHUB_REF_NAME } else { $env:INPUT_TAG }
+          if ([string]::IsNullOrWhiteSpace($tag)) { throw "没有拿到发布标签" }
+          if ($tag -notmatch '^v\d+\.\d+') { throw "标签格式不对（应形如 v1.1.0）：$tag" }
+          $ver = $tag -replace '^v', ''
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          "ver=$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "标签=$tag 版本=$ver"
+
+      - name: 缓存依赖底座
+        id: cacheDeps
+        uses: actions/cache@v4
+        with:
+          path: _deps
+          key: deps-zip-${{ inputs.deps_tag || 'v1.0.0' }}
+
+      - name: 下载依赖底座
+        if: steps.cacheDeps.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPS_TAG: ${{ inputs.deps_tag || 'v1.0.0' }}
+        run: |
+          mkdir -p _deps
+          gh release download "$DEPS_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "*_full.zip" \
+            --dir _deps --clobber
+          ls -lh _deps
+
+      - name: 补齐第三方依赖
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem _deps -Filter *_full.zip | Select-Object -First 1
+          if (-not $zip) { throw "依赖底座里没有 *_full.zip，检查 deps_tag" }
+
+          Expand-Archive $zip.FullName -DestinationPath _deps/unpacked -Force
+
+          $exe = Get-ChildItem _deps/unpacked -Recurse -Filter ModPcGUI.exe | Select-Object -First 1
+          if (-not $exe) { throw "底座结构变了：找不到 ModPcGUI.exe" }
+          $rt = $exe.Directory.FullName
+          Write-Host "运行目录：$rt"
+          "RT=$rt" >> $env:GITHUB_ENV
+
+          New-Item -ItemType Directory -Force -Path ModPcGUI/pcl | Out-Null
+          Copy-Item "$rt/pcl/*" ModPcGUI/pcl -Recurse -Force
+          # 底座里的旧样式表会被工程里的新版覆盖；先删掉，避免 PreserveNewest 判定后留下旧文件
+          Remove-Item ModPcGUI/pcl/PclStyles.xaml -ErrorAction SilentlyContinue
+
+          New-Item -ItemType Directory -Force -Path modpc/ModPc | Out-Null
+          Copy-Item "$rt/Newtonsoft.Json.dll" modpc/ModPc -Force
+          Copy-Item "$rt/Mcl.Core.dll" modpc/ModPc -Force
+
+          $need = @(
+            'ModPcGUI/pcl/PCL.Core.dll',
+            'ModPcGUI/pcl/MeloongCore.dll',
+            'ModPcGUI/pcl/MeloongCore.Wpf.dll',
+            'modpc/ModPc/Mcl.Core.dll',
+            'modpc/ModPc/Newtonsoft.Json.dll'
+          )
+          $miss = @($need | Where-Object { -not (Test-Path $_) })
+          if ($miss.Count) { throw ("依赖仍缺失：" + ($miss -join '; ')) }
+          Write-Host "依赖齐了"
+
+      - name: 编译 Release
+        shell: bash
+        run: dotnet build ModPcGUI/src/ModPcGUI.csproj -c Release --nologo -v minimal
+
+      - name: 组装可运行包
+        shell: pwsh
+        run: |
+          # 不关掉进度条的话，Compress-Archive 会在日志里刷几百行
+          $ProgressPreference = 'SilentlyContinue'
+          $ver = "${{ steps.ver.outputs.ver }}"
+          $rt  = $env:RT
+          $bin = "ModPcGUI/src/bin/Release/net48"
+          if (-not (Test-Path "$bin/ModPcGUI.exe")) { throw "编译产物缺失：$bin/ModPcGUI.exe" }
+
+          Remove-Item _pkg -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path _pkg | Out-Null
+
+          # 底座本身就是完整运行目录，直接作为包体
+          Copy-Item "$rt/*" _pkg -Recurse -Force
+          # 再用新编译的产物覆盖（含 pcl/PclStyles.xaml）
+          Copy-Item "$bin/*" _pkg -Recurse -Force
+          Get-ChildItem _pkg -Recurse -Filter *.pdb | Remove-Item -Force
+
+          # 清掉本地痕迹：账号数据、上次的运行路径、日志
+          foreach ($p in 'config.json','user','run.log','crash.log','crash.log.prev','ModPcGUI.exe.bak') {
+            Remove-Item "_pkg/$p" -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+          Copy-Item LICENSE _pkg -Force -ErrorAction SilentlyContinue
+          Copy-Item 免责声明.txt _pkg -Force -ErrorAction SilentlyContinue
+          Copy-Item README.md _pkg/docs-README.md -Force -ErrorAction SilentlyContinue
+
+          Remove-Item out -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force -Path out | Out-Null
+          $zip = "out/ES_Tool_v${ver}_full.zip"
+          Compress-Archive -Path "_pkg/*" -DestinationPath $zip -CompressionLevel Optimal
+
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  ES_Tool_v${ver}_full.zip" | Out-File -Encoding ascii "out/ES_Tool_v${ver}_full.zip.sha256"
+
+          $mb = [math]::Round((Get-Item $zip).Length / 1MB, 1)
+          Write-Host "已打包 $zip（$mb MB）"
+          Write-Host "文件数：$((Get-ChildItem _pkg -Recurse -File).Count)"
+          Get-Content "out/ES_Tool_v${ver}_full.zip.sha256"
+
+      - name: 留档构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ES_Tool_v${{ steps.ver.outputs.ver }}_full
+          path: out/*
+          if-no-files-found: error
+
+      - name: 创建 Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+          VER: ${{ steps.ver.outputs.ver }}
+          IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          PRE: ${{ inputs.prerelease }}
+          DRAFT: ${{ inputs.draft }}
+          DEPS_TAG: ${{ inputs.deps_tag || 'v1.0.0' }}
+        run: |
+          set -e
+          prev=$(git describe --tags --abbrev=0 --exclude "$TAG" 2>/dev/null || true)
+
+          cat > notes.md <<EOF
+          ### ES Tool v$VER
+
+          由 CI 从 \`${GITHUB_SHA:0:7}\` 构建，目标框架 .NET Framework 4.8 / x86。
+
+          EOF
+
+          if [ -n "$prev" ]; then
+            echo "**相对 \`$prev\` 的提交**" >> notes.md
+            echo >> notes.md
+            echo '```' >> notes.md
+            git log --oneline --no-decorate "$prev..HEAD" >> notes.md
+            echo '```' >> notes.md
+            echo >> notes.md
+          fi
+
+          cat >> notes.md <<EOF
+          **包含文件**
+
+          - \`ES_Tool_v${VER}_full.zip\` —— 完整运行目录，解压后双击 \`ModPcGUI.exe\`
+          - \`ES_Tool_v${VER}_full.zip.sha256\` —— 校验值
+
+          **说明**
+
+          - 包内的 \`modpc/\` 与 \`pcl/\` 取自依赖底座 \`$DEPS_TAG\`，本仓库不含这些第三方二进制
+          - 已清除 \`user/\`、\`config.json\` 与日志；首次运行会自动重建
+          - 单文件版 \`_single.exe\` 由本地自解压打包器生成，不在 CI 产出范围内
+          EOF
+
+          args=( "$TAG" out/*.zip out/*.sha256 --title "ES Tool v$VER" --notes-file notes.md )
+          [ "$IS_DISPATCH" = "true" ] && args+=( --target "$GITHUB_SHA" )
+          [ "$PRE" = "true" ] && args+=( --prerelease )
+          [ "$DRAFT" = "true" ] && args+=( --draft )
+
+          gh release create "${args[@]}"
