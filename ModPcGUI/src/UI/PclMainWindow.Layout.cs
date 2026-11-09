@@ -910,6 +910,11 @@ namespace ModPcGUI
             _pclRuntimeReady = true;
             try
             {
+                // 0) 纠正 PCL 的 UI 线程判定。ModBase.UiThreadId 在模块初始化时
+                //    取当时线程的 ID，宿主里可能落在工作线程上，导致动画线程
+                //    误判「已在 UI 线程」直接在非 UI 线程操作控件。
+                //    必须在 AniStart 起动画线程之前改，详见 PclHostFix。
+                PclHostFix.FixUiThreadId();
                 // PCL 原版在 Application_Startup 里做的事，宿主进程必须补齐：
                 // 1) MeloongCore 核心 / WPF 前端初始化
                 MeloongCore.Main.Init("PCL");
@@ -925,8 +930,14 @@ namespace ModPcGUI
                 }
                 catch { }
                 MeloongCore.Logger.Instance = logger;
-                // 3) 常驻动画线程（AaColor/AaScale 只注册，逐帧执行靠这条线程）
-                PCL.ModAnimation.AniStart();
+                // 3) 动画帧循环。PCL 原版是起一条独立线程、每帧用 RunInUiWait
+                //    投递回 UI 线程；而「当前是不是 UI 线程」的判定在宿主里不可靠
+                //    （ModBase.UiThreadId 取的是模块初始化时那条线程的 ID），
+                //    判定失败就会在动画线程里直接操作控件，报跨线程访问。
+                //    这里改用 UI 线程上的 DispatcherTimer 直接驱动 AniTimer，
+                //    RunInUi 那套判断完全不参与；失败才回退到 PCL 原实现。
+                if (!PclHostFix.StartAnimationLoop())
+                    PCL.ModAnimation.AniStart();
             }
             catch (Exception ex)
             {

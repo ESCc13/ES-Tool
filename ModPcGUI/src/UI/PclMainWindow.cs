@@ -22,10 +22,21 @@ namespace ModPcGUI
         private readonly PCL.MyTextBox _logBox = new PCL.MyTextBox();
         private readonly PCL.MyTextBox _pathBox = new PCL.MyTextBox();
         private readonly PCL.MyTextBox _addrBox = new PCL.MyTextBox();
-        private readonly PCL.MyComboBox _accBox = new PCL.MyComboBox();
-        private readonly PCL.MyComboBox _modeBox = new PCL.MyComboBox();
-        private readonly PCL.MyComboBox _typeBox = new PCL.MyComboBox();
-        private readonly PCL.MyComboBox _roomKindBox = new PCL.MyComboBox();
+        private readonly PCL.MyComboBox _accBox = NewCombo();
+        private readonly PCL.MyComboBox _modeBox = NewCombo();
+        private readonly PCL.MyComboBox _typeBox = NewCombo();
+        private readonly PCL.MyComboBox _roomKindBox = NewCombo();
+
+        /// <summary>
+        /// 建下拉框并打上宿主补丁：PCL 的 MyComboBox_DropDownOpened 会读 FrmMain.Opacity，
+        /// 而宿主里没有 FrmMain，展开必抛 NRE 并弹反馈窗。详见 PclHostFix。
+        /// </summary>
+        private static PCL.MyComboBox NewCombo()
+        {
+            var box = new PCL.MyComboBox();
+            PclHostFix.FixComboBox(box);
+            return box;
+        }
         private readonly PCL.MyTextBox _roomIdBox = new PCL.MyTextBox();
         private readonly PCL.MyListItem _rbCustom = new PCL.MyListItem();
         private readonly PCL.MyListItem _rbLobby = new PCL.MyListItem();

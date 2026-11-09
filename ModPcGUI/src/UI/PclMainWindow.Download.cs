@@ -77,7 +77,8 @@ namespace ModPcGUI
             verRow.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(1, Wpf.GridUnitType.Star) });
             verRow.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = Wpf.GridLength.Auto });
 
-            _dlVerBox = new PCL.MyComboBox { Height = 30 };
+            _dlVerBox = NewCombo();
+            _dlVerBox.Height = 30;
             _dlVerBox.SelectedIndex = -1;
             WpfC.Grid.SetColumn(_dlVerBox, 0);
             verRow.Children.Add(_dlVerBox);
