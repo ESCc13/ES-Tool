@@ -148,6 +148,69 @@ namespace ModPcGUI
 
         // ---------------- 3) 下拉框展开 ----------------
 
+        /// <summary>建一个已打过宿主补丁的 PCL 下拉框。</summary>
+        internal static WpfC.ComboBox NewCombo()
+        {
+            var box = new PCL.MyComboBox();
+            FixComboBox(box);
+            return box;
+        }
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, object> _patchedBoxes =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<object, object>();
+
+        /// <summary>
+        /// 兜底：把一棵界面树里所有 PCL.MyComboBox 都打上补丁。
+        ///
+        /// 光靠「创建时走 NewCombo()」不稳 —— 漏一处就崩一处（联机大厅那两个下拉框
+        /// 就是这么漏的）。这里在窗口 Loaded / 页面切换后统一扫一遍，
+        /// 用弱表记住已处理的实例，重复扫描不会重复挂事件。
+        /// </summary>
+        internal static void PatchComboBoxes(Wpf.DependencyObject root)
+        {
+            if (root == null) return;
+            int added = 0;
+            try
+            {
+                var stack = new System.Collections.Generic.Stack<Wpf.DependencyObject>();
+                stack.Push(root);
+                int guard = 0;
+                while (stack.Count > 0 && guard++ < 20000)
+                {
+                    var cur = stack.Pop();
+                    if (cur == null) continue;
+
+                    if (cur is PCL.MyComboBox box && !_patchedBoxes.TryGetValue(box, out _))
+                    {
+                        _patchedBoxes.Add(box, box);
+                        FixComboBox(box);
+                        added++;
+                    }
+
+                    // 逻辑树（页面内容是手搭的，逻辑树最全）
+                    try
+                    {
+                        foreach (var ch in Wpf.LogicalTreeHelper.GetChildren(cur))
+                            if (ch is Wpf.DependencyObject d) stack.Push(d);
+                    }
+                    catch { }
+
+                    // 可视树（覆盖模板 / 数据模板里生成的实例）
+                    try
+                    {
+                        int c = Wpf.Media.VisualTreeHelper.GetChildrenCount(cur);
+                        for (int i = 0; i < c; i++) stack.Push(Wpf.Media.VisualTreeHelper.GetChild(cur, i));
+                    }
+                    catch { }
+                }
+            }
+            catch (Exception ex)
+            {
+                Note("PatchComboBoxes 失败：" + ex.GetType().Name + " " + ex.Message);
+            }
+            if (added > 0) Note($"PatchComboBoxes: 新接管 {added} 个下拉框");
+        }
+
         /// <summary>
         /// 卸掉 PCL 的 DropDownOpened / DropDownClosed，再挂上等价但安全的实现。
         /// </summary>

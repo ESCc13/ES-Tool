@@ -249,6 +249,8 @@ namespace ModPcGUI
                 LoadUi();
                 RefreshState();
                 UpdateLaunchCaption();
+                // 首次进场先把整棵树里的 PCL 下拉框都接管掉
+                try { PclHostFix.PatchComboBoxes(this); } catch { }
                 AppendLog("ES Tool 已就绪（PCL2 原生 UI）\r\n");
             };
         }
@@ -836,6 +838,10 @@ namespace ModPcGUI
                 _lbLoaded = true;
                 LobbySearch();
             }
+
+            // 兜底：新页面里可能有创建时没走工厂的 PCL 下拉框（展开就 NRE 弹反馈窗）。
+            // 布局完成后统一扫一遍，重复扫描有弱表去重。
+            try { PclHostFix.PatchComboBoxes(this); } catch { }
         }
 
         private void UpdateAddrRow()

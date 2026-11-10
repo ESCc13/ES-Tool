@@ -14,8 +14,10 @@ namespace ModPcGUI
     /// </summary>
     public sealed partial class PclMainWindow
     {
-        private readonly PCL.MyComboBox _lbEdition = new PCL.MyComboBox();
-        private readonly PCL.MyComboBox _lbSort = new PCL.MyComboBox();
+        // 走 NewCombo() 工厂：PCL 自己的 DropDownOpened 会读 FrmMain.Opacity，
+        // 宿主里 FrmMain 恒为 Nothing，展开必抛 NRE。直接用 new 就会漏补丁。
+        private readonly PCL.MyComboBox _lbEdition = NewCombo();
+        private readonly PCL.MyComboBox _lbSort = NewCombo();
         private readonly PCL.MyTextBox _lbKw = new PCL.MyTextBox();
         private PCL.MyButton _lbSearchBtn;
         private readonly WpfC.StackPanel _lbMapList = new WpfC.StackPanel();
