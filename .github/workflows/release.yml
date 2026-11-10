@@ -126,6 +126,20 @@ jobs:
         shell: bash
         run: dotnet build ModPcGUI/src/ModPcGUI.csproj -c Release --nologo -v minimal
 
+      # 更新.txt 是本项目的版本说明，随包发布。
+      # 显示名与 tag 的差别只在预发布分隔符：v1.1.2-2-pre.4ef8ea → 1.1.2-2-pre-4ef8ea
+      - name: 更新更新日志
+        shell: bash
+        env:
+          VER: ${{ steps.ver.outputs.ver }}
+        run: |
+          name="$VER"
+          name="${name/-pre./-pre-}"
+          name="${name/-Pre./-Pre-}"
+          bash tools/changelog.sh "$name"
+          echo "---- 更新.txt ----"
+          cat 更新.txt
+
       - name: 组装可运行包
         shell: pwsh
         run: |
@@ -152,6 +166,7 @@ jobs:
 
           Copy-Item LICENSE _pkg -Force -ErrorAction SilentlyContinue
           Copy-Item 免责声明.txt _pkg -Force -ErrorAction SilentlyContinue
+          Copy-Item 更新.txt _pkg -Force -ErrorAction SilentlyContinue
           Copy-Item README.md _pkg/docs-README.md -Force -ErrorAction SilentlyContinue
 
           Remove-Item out -Recurse -Force -ErrorAction SilentlyContinue
@@ -195,6 +210,12 @@ jobs:
 
           EOF
 
+          # 把 更新.txt 的最后一段（本次版本）摘进说明，下载页就能直接看到改了什么
+          if [ -f 更新.txt ]; then
+            awk '/^\[/ { buf = "" } { buf = buf $0 "\n" } END { if (buf != "") printf "%s", buf }' 更新.txt >> notes.md
+            echo >> notes.md
+          fi
+
           if [ -n "$prev" ]; then
             echo "**相对 \`$prev\` 的提交**" >> notes.md
             echo >> notes.md
@@ -209,6 +230,7 @@ jobs:
 
           - \`ES_Tool_v${VER}_full.zip\` —— 完整运行目录，解压后双击 \`ModPcGUI.exe\`
           - \`ES_Tool_v${VER}_full.zip.sha256\` —— 校验值
+          - 包内另有 \`更新.txt\`，逐个版本记录相对上一版的提交
 
           **说明**
 

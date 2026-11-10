@@ -1,0 +1,21 @@
+[1.0.0]
+[~]基础功能
+[1.1.0]
+相对 v1.0.0 的提交
+b4e0cb0 ci: 新增 Release 构建发布流水线
+994d739 feat: 移植 PCL 界面风格与动画，新增网易 NEMC 下载页
+480765a docs: README 开发者栏补上 fork 维护者的 GitHub 链接
+ca2dd9a README：补徽章、项目地址、Releases 下载表格（对齐 v1.0.0 资产名）
+[1.1.1]
+相对 v1.1.0 的提交
+679ecb8 fix: 动画跨线程崩溃与下拉框展开报错
+ad6f8e7 docs: README 只保留一张软件截图
+4c55fb7 docs: README 主图换成启动页新截图
+[1.1.2-Pre-67ca4c]
+相对 v1.1.1 的提交
+34b281b fix: 联机大厅下拉框仍然展开即崩（设置下拉框透明度失败）
+78ea06c fix: 一键布吉岛 / 一键EC 认证失败
+3977055 fix: 启动游戏静默失败 —— config 检查前置、参数队列不再错位
+[1.1.2-2-pre-4ef8ea]
+相对 v1.1.2-pre.67ca4c 的提交
+6bad1be feat: 日志分级格式 / 无 item_ids 也可启动 / 4399 登录补 uni_sauth / 主界面按 PCL 原版 XAML 对齐

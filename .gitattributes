@@ -1,0 +1,5 @@
+# 更新.txt 用 CRLF，且不做换行转换：CI 与本地都按原字节读写，避免追加时段落混行
+更新.txt -text
+
+# 构建脚本必须 LF，否则在 Linux / Git Bash 里会因 \r 报 "bad interpreter"
+*.sh text eol=lf
