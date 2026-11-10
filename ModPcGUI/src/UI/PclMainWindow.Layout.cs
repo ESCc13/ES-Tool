@@ -81,38 +81,51 @@ namespace ModPcGUI
             var sub = Brush("#8c8c8c");        // PCL ColorBrushGray3
             var rightBg = Brush("#d5e6fd");    // PCL ColorBrush6
 
-            // 窗口外框（圆角）
+            // PCL FormMain.xaml 原版外框：PanBack(Margin 10) → BorderForm(Margin 8, 圆角 6, 圆角裁剪)
+            var panBack = new WpfC.Grid { Margin = new Wpf.Thickness(10) };
             var frame = new WpfC.Border
             {
-                CornerRadius = new Wpf.CornerRadius(8),
-                Background = Brushes.White,
-                BorderBrush = Brush("#8899aa"),
-                BorderThickness = new Wpf.Thickness(1),
-                ClipToBounds = true
+                Margin = new Wpf.Thickness(8),
+                Background = Brushes.White
             };
+            var rectForm = new Wpf.Media.RectangleGeometry { RadiusX = 6, RadiusY = 6 };
+            frame.Clip = rectForm;
+            frame.SizeChanged += (s, e) =>
+            {
+                if (e.NewSize.Width > 0 && e.NewSize.Height > 0)
+                    rectForm.Rect = new Wpf.Rect(0, 0, e.NewSize.Width, e.NewSize.Height);
+            };
+            panBack.Children.Add(frame);
             var main = new WpfC.Grid();
             main.RowDefinitions.Add(new WpfC.RowDefinition { Height = new Wpf.GridLength(48) });
             main.RowDefinitions.Add(new WpfC.RowDefinition { Height = new Wpf.GridLength(1, Wpf.GridUnitType.Star) });
             frame.Child = main;
 
-            // ---------- 顶栏：PCL FormMain 同款（左 Logo / 中 MyRadioButton 导航 / 右 min·close） ----------
-            var head = new WpfC.Grid { Background = blue };
-            head.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(1, Wpf.GridUnitType.Star) });
-            head.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = Wpf.GridLength.Auto });
-            head.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(1, Wpf.GridUnitType.Star) });
+            // ---------- 顶栏：PCL PanTitle（高 48 / ColorObject4 底色 / 左 Logo · 中导航 · 右 min·close） ----------
+            var head = new WpfC.Grid { Height = 48 };
+            head.SetResourceReference(WpfC.Grid.BackgroundProperty, "ColorBrush4");
 
-            // 左：Logo（PCL LabTitleLogo 同款：PCL English 字体、白色 17px）
+            // PCL PanTitleMain：1* / Auto / 1* 三列；Logo 落在左列，导航落在中列（Margin 13,0）
+            var titleMain = new WpfC.Grid { HorizontalAlignment = Wpf.HorizontalAlignment.Stretch };
+            titleMain.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(1, Wpf.GridUnitType.Star) });
+            titleMain.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = Wpf.GridLength.Auto });
+            titleMain.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(1, Wpf.GridUnitType.Star) });
+            head.Children.Add(titleMain);
+
+            // 左：Logo（PCL LabTitleLogo：PCL English 字体、白色 17px、Margin 18,0）
             var leftHead = new WpfC.TextBlock
             {
                 Text = "ES Tool",
-                FontFamily = LogoFont(),       // PCL2 内嵌的 PCL English 字体
+                FontFamily = LogoFont(),
                 FontSize = 17,
                 Foreground = Brushes.White,
                 VerticalAlignment = Wpf.VerticalAlignment.Center,
-                Margin = new Wpf.Thickness(18, 0, 0, 0)
+                HorizontalAlignment = Wpf.HorizontalAlignment.Left,
+                Margin = new Wpf.Thickness(18, 0, 0, 0),
+                IsHitTestVisible = false
             };
             WpfC.Grid.SetColumn(leftHead, 0);
-            head.Children.Add(leftHead);
+            titleMain.Children.Add(leftHead);
 
             // 中：PCL PanTitleSelect 同款 MyRadioButton 导航（单选互斥靠同一父容器）
             var navPanel = new WpfC.StackPanel
@@ -123,7 +136,7 @@ namespace ModPcGUI
                 Margin = new Wpf.Thickness(13, 0, 0, 0)
             };
             WpfC.Grid.SetColumn(navPanel, 1);
-            head.Children.Add(navPanel);
+            titleMain.Children.Add(navPanel);
             for (int i = 0; i < NavNames.Length; i++)
             {
                 int idx = i;
@@ -141,17 +154,7 @@ namespace ModPcGUI
                 navPanel.Children.Add(rb);
             }
 
-            // 右：最小化 / 关闭（PCL FormMain 原版尺寸、边距、图标路径）
-            var rightHead = new WpfC.StackPanel
-            {
-                Orientation = WpfC.Orientation.Horizontal,
-                VerticalAlignment = Wpf.VerticalAlignment.Center,
-                HorizontalAlignment = Wpf.HorizontalAlignment.Right,
-                Margin = new Wpf.Thickness(0, 0, 12, 0)
-            };
-            WpfC.Grid.SetColumn(rightHead, 2);
-            head.Children.Add(rightHead);
-
+            // 右：最小化 / 关闭（PCL 原版是绝对定位：Min Margin 0,0,44,0；Close Margin 0,0,12,0，均 28×28）
             var min = new PCL.MyIconButton
             {
                 Logo = "F1 M0,0 h15 v2 h-15 v-2 Z",
@@ -159,12 +162,14 @@ namespace ModPcGUI
                 Theme = PCL.MyIconButton.Themes.White,
                 Width = 28,
                 Height = 28,
-                Margin = new Wpf.Thickness(0, 0, 16, 0),
+                HorizontalAlignment = Wpf.HorizontalAlignment.Right,
+                VerticalAlignment = Wpf.VerticalAlignment.Center,
+                Margin = new Wpf.Thickness(0, 0, 44, 0),
                 ToolTip = "最小化"
             };
             min.Click += (s, e) => { WindowState = Wpf.WindowState.Minimized; };
             PaintIcon(min);
-            rightHead.Children.Add(min);
+            head.Children.Add(min);
 
             var close = new PCL.MyIconButton
             {
@@ -173,11 +178,14 @@ namespace ModPcGUI
                 Theme = PCL.MyIconButton.Themes.White,
                 Width = 28,
                 Height = 28,
+                HorizontalAlignment = Wpf.HorizontalAlignment.Right,
+                VerticalAlignment = Wpf.VerticalAlignment.Center,
+                Margin = new Wpf.Thickness(0, 0, 12, 0),
                 ToolTip = "关闭"
             };
             close.Click += (s, e) => { Close(); };
             PaintIcon(close);
-            rightHead.Children.Add(close);
+            head.Children.Add(close);
 
             head.MouseLeftButtonDown += (s, e) =>
             {
@@ -190,24 +198,41 @@ namespace ModPcGUI
             WpfC.Grid.SetRow(head, 0);
             main.Children.Add(head);
 
-            // ---------- 主体：左白 / 右浅蓝 ----------
+            // ---------- 主体：PanLeft(300) + 4px 阴影 + PanMainRight ----------
             var body = new WpfC.Grid();
-            body.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(312) });
+            body.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(300) });
+            body.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(4) });
             body.ColumnDefinitions.Add(new WpfC.ColumnDefinition { Width = new Wpf.GridLength(1, Wpf.GridUnitType.Star) });
             WpfC.Grid.SetRow(body, 1);
 
             var leftPanel = BuildLeftPanel(blue, text, sub);
+            leftPanel.SetResourceReference(WpfC.Panel.BackgroundProperty, "ColorBrushBackgroundTransparentSidebar");
             WpfC.Grid.SetColumn(leftPanel, 0);
             body.Children.Add(leftPanel);
 
-            var rightPanel = new WpfC.Grid { Background = rightBg };
-            WpfC.Grid.SetColumn(rightPanel, 1);
+            // PCL RectLeftShadow：左栏右缘 4px 渐变阴影（黑 4% → 透明）
+            var leftShadow = new Wpf.Shapes.Rectangle();
+            var shadowBrush = new Wpf.Media.LinearGradientBrush
+            {
+                StartPoint = new Wpf.Point(0, 0),
+                EndPoint = new Wpf.Point(1, 0),
+                Opacity = 0.04
+            };
+            shadowBrush.GradientStops.Add(new Wpf.Media.GradientStop(Wpf.Media.Colors.Black, 0));
+            shadowBrush.GradientStops.Add(new Wpf.Media.GradientStop(Wpf.Media.Color.FromArgb(0, 0, 0, 0), 1));
+            leftShadow.Fill = shadowBrush;
+            WpfC.Grid.SetColumn(leftShadow, 1);
+            body.Children.Add(leftShadow);
+
+            var rightPanel = new WpfC.Grid();
+            rightPanel.SetResourceReference(WpfC.Panel.BackgroundProperty, "ColorBrush6");
+            WpfC.Grid.SetColumn(rightPanel, 2);
             _contentHost = rightPanel;
             BuildPages(blue, text, sub);
             body.Children.Add(rightPanel);
 
             main.Children.Add(body);
-            Content = frame;
+            Content = panBack;
 
             NavTo(0);
 
@@ -258,15 +283,21 @@ namespace ModPcGUI
         // ---------- 左侧启动面板 ----------
         private WpfC.Panel BuildLeftPanel(SolidColorBrush blue, SolidColorBrush text, SolidColorBrush sub)
         {
-            var left = new WpfC.Grid { Background = Brushes.White };
-            var dock = new WpfC.DockPanel { Margin = new Wpf.Thickness(24, 18, 24, 18) };
+            // 严格按 PCL PageLaunchLeft.xaml 的行结构：
+            //   Row0 Auto  顶部状态胶囊（Margin 20,24,20,-4）
+            //   Row1 *     账号区（垂直居中，Margin 20,0）
+            //   Row2 Auto  大启动键（高 54，Margin 20,0）+ 版本小字（FontSize 11，Margin 35,0,35,10）
+            //   Row3 Auto  次级按钮（高 35，Margin 0,10,10,0）
+            //   Row4 20    底部留白
+            var left = new WpfC.Grid();
+            left.RowDefinitions.Add(new WpfC.RowDefinition { Height = Wpf.GridLength.Auto });
+            left.RowDefinitions.Add(new WpfC.RowDefinition { Height = new Wpf.GridLength(1, Wpf.GridUnitType.Star) });
+            left.RowDefinitions.Add(new WpfC.RowDefinition { Height = Wpf.GridLength.Auto });
+            left.RowDefinitions.Add(new WpfC.RowDefinition { Height = Wpf.GridLength.Auto });
+            left.RowDefinitions.Add(new WpfC.RowDefinition { Height = new Wpf.GridLength(20) });
 
-            // ===== 顶部：头像 + 账号（PCL 启动页同款结构） =====
-            var accCard = new WpfC.StackPanel();
-            WpfC.DockPanel.SetDock(accCard, WpfC.Dock.Top);
-
-            // 顶部状态胶囊（PCL PageLaunchLeft PanTypeOne 同款：圆角 13、半透明底、ColorBrush3 字色）
-            var pillWrap = new WpfC.Grid { Margin = new Wpf.Thickness(0, 0, 0, 12) };
+            // ===== Row0：顶部状态胶囊（PCL PanTypeOne：圆角 13、MaxHeight 27、ColorBrush3 字色）=====
+            var pillWrap = new WpfC.Grid { Margin = new Wpf.Thickness(20, 24, 20, -4) };
             var pill = new WpfC.Border
             {
                 HorizontalAlignment = Wpf.HorizontalAlignment.Center,
@@ -281,14 +312,23 @@ namespace ModPcGUI
                 Text = "已就绪 · 网易渠道",
                 FontSize = 14,
                 VerticalAlignment = Wpf.VerticalAlignment.Center,
-                Margin = new Wpf.Thickness(12, 0, 12, 0)
+                Margin = new Wpf.Thickness(15, 0, 12, 0)
             };
             _statePill.SetResourceReference(WpfC.TextBlock.ForegroundProperty, "ColorBrush3");
             pill.Child = _statePill;
             pillWrap.Children.Add(pill);
-            accCard.Children.Add(pillWrap);
+            WpfC.Grid.SetRow(pillWrap, 0);
+            left.Children.Add(pillWrap);
 
-            // PCL 原版：头像居中，账号名只出现在下拉框里
+            // ===== Row1：账号区（PCL PanLogin：整块垂直居中）=====
+            var panLogin = new WpfC.StackPanel
+            {
+                Margin = new Wpf.Thickness(20, 0, 20, 0),
+                VerticalAlignment = Wpf.VerticalAlignment.Center
+            };
+            WpfC.Grid.SetRow(panLogin, 1);
+
+            // 头像居中（PCL 原版：头像在账号区正中，账号名只出现在下拉框里）
             var avatar = new WpfC.Image
             {
                 Width = 48,
@@ -299,7 +339,7 @@ namespace ModPcGUI
             };
             avatar.Source = LoadHead();
             avatar.Clip = new Wpf.Media.RectangleGeometry(new Wpf.Rect(0, 0, 48, 48), 8, 8);
-            accCard.Children.Add(avatar);
+            panLogin.Children.Add(avatar);
 
             // 账号下拉（PCL 原生 MyComboBox）+ 删除
             var comboRow = new WpfC.Grid { Margin = new Wpf.Thickness(0, 0, 0, 8) };
@@ -326,10 +366,9 @@ namespace ModPcGUI
             PaintIcon(delBtn);
             WpfC.Grid.SetColumn(delBtn, 1);
             comboRow.Children.Add(delBtn);
-            accCard.Children.Add(comboRow);
+            panLogin.Children.Add(comboRow);
 
-            // 登录键（PCL MyButton：Highlight 深蓝质感 + 自带悬停/按下动画）
-            // 登录成功后整行隐藏（RefreshState 里处理），把空间让给账号区
+            // 登录 / 添加账号（登录成功后整行隐藏，RefreshState 里处理）
             var btnRow = new WpfC.Grid { Margin = new Wpf.Thickness(0, 0, 0, 4) };
             _btnLoginRow = btnRow;
             btnRow.ColumnDefinitions.Add(new WpfC.ColumnDefinition());
@@ -342,9 +381,6 @@ namespace ModPcGUI
                 Margin = new Wpf.Thickness(0, 0, 5, 0)
             };
             WpfC.TextBlock.SetFontSize(bLogin, 13);
-            // Click + PreviewMouseLeftButtonUp 双通道：PCL 的 MyButton 模板在少数情况下
-            // 会把 Click 吃掉（SetNameDialog.cs 里踩过同一个坑），这里用 400ms 防抖保证
-            // 一次点击只跑一次 DoLogin，但绝不会「点了没反应」。
             DateTime lastLogin = DateTime.MinValue;
             Action fireLogin = () =>
             {
@@ -366,14 +402,9 @@ namespace ModPcGUI
             WpfC.Grid.SetColumn(bAdd, 1);
             btnRow.Children.Add(bLogin);
             btnRow.Children.Add(bAdd);
-            accCard.Children.Add(btnRow);
-            dock.Children.Add(accCard);
+            panLogin.Children.Add(btnRow);
 
-            // ===== 底部：版本选择 + 启动 + 快捷键 =====
-            var bottom = new WpfC.StackPanel();
-            WpfC.DockPanel.SetDock(bottom, WpfC.Dock.Bottom);
-
-            // 「启动模式」行（登录成功后随登录按钮一起隐藏，RefreshState 里处理）
+            // 启动模式（登录成功后随登录按钮一起隐藏）
             var modeRow = new WpfC.StackPanel();
             _modeRow = modeRow;
             modeRow.Children.Add(new WpfC.TextBlock
@@ -381,21 +412,21 @@ namespace ModPcGUI
                 Text = "启动模式",
                 FontSize = 11,
                 Foreground = sub,
-                Margin = new Wpf.Thickness(2, 0, 0, 5)
+                Margin = new Wpf.Thickness(2, 2, 0, 5)
             });
             _modeBox.Height = 30;
             _modeBox.FontSize = 12;
-            _modeBox.Margin = new Wpf.Thickness(0, 0, 0, 12);
             _modeBox.Items.Add(new PCL.MyComboBoxItem { Content = "自动识别" });
             _modeBox.Items.Add(new PCL.MyComboBoxItem { Content = "电脑版" });
             _modeBox.Items.Add(new PCL.MyComboBoxItem { Content = "手机版" });
             _modeBox.SelectedIndex = 0;
             modeRow.Children.Add(_modeBox);
-            bottom.Children.Add(modeRow);
+            panLogin.Children.Add(modeRow);
 
-            // 大启动键（PCL PageLaunchLeft BtnLaunch 同款：54 高、Highlight、Padding 30/15，
-            // 版本小字 LabVersion 叠在按钮底部中央）
-            var launchWrap = new WpfC.Grid { Margin = new Wpf.Thickness(0, 0, 0, 10) };
+            left.Children.Add(panLogin);
+
+            // ===== Row2：大启动键（PCL BtnLaunch：Height 54 / Margin 20,0 / Padding 30,0,30,15）=====
+            var launchWrap = new WpfC.Grid { Margin = new Wpf.Thickness(20, 0, 20, 0) };
             var launch = new PCL.MyButton
             {
                 Text = "启动游戏",
@@ -406,25 +437,28 @@ namespace ModPcGUI
             WpfC.TextBlock.SetFontSize(launch, 16);
             launch.Click += (s, e) => DoLaunch();
             launchWrap.Children.Add(launch);
+            // PCL LabVersion：FontSize 11 / Margin 35,0,35,10 / 底部居中对齐
             _launchSub = new WpfC.TextBlock
             {
-                Text = "1.21.120  ·  官方大厅  ·  未登录",
-                FontSize = 10.5,
+                Text = "1.21.120",
+                FontSize = 11,
                 IsHitTestVisible = false,
                 TextAlignment = Wpf.TextAlignment.Center,
                 VerticalAlignment = Wpf.VerticalAlignment.Bottom,
                 HorizontalAlignment = Wpf.HorizontalAlignment.Center,
-                Margin = new Wpf.Thickness(35, 0, 35, 9),
+                Margin = new Wpf.Thickness(35, 0, 35, 10),
                 TextTrimming = Wpf.TextTrimming.CharacterEllipsis
             };
             _launchSub.SetResourceReference(WpfC.TextBlock.ForegroundProperty, "ColorBrushGray3");
             launchWrap.Children.Add(_launchSub);
-            bottom.Children.Add(launchWrap);
+            WpfC.Grid.SetRow(launchWrap, 2);
+            left.Children.Add(launchWrap);
 
-            var row = new WpfC.Grid();
+            // ===== Row3：次级按钮（PCL BtnVersion / BtnMore：Height 35 / Margin 0,10,10,0）=====
+            var row = new WpfC.Grid { Margin = new Wpf.Thickness(0, 10, 10, 0) };
             row.ColumnDefinitions.Add(new WpfC.ColumnDefinition());
             row.ColumnDefinitions.Add(new WpfC.ColumnDefinition());
-            var bBjd = new PCL.MyButton { Text = "一键布吉岛", Height = 35, Margin = new Wpf.Thickness(0, 0, 5, 0) };
+            var bBjd = new PCL.MyButton { Text = "一键布吉岛", Height = 35, Margin = new Wpf.Thickness(20, 0, 5, 0) };
             WpfC.TextBlock.SetFontSize(bBjd, 12.5);
             bBjd.Click += (s, e) => DoQuick("fastbjd", "一键布吉岛");
             var bEc = new PCL.MyButton { Text = "一键 EC", Height = 35, Margin = new Wpf.Thickness(5, 0, 0, 0) };
@@ -434,16 +468,9 @@ namespace ModPcGUI
             WpfC.Grid.SetColumn(bEc, 1);
             row.Children.Add(bBjd);
             row.Children.Add(bEc);
-            bottom.Children.Add(row);
+            WpfC.Grid.SetRow(row, 3);
+            left.Children.Add(row);
 
-            dock.Children.Add(bottom);
-
-            // ===== 中部占位 =====
-            // 必须最后添加：DockPanel 默认 LastChildFill，最后加入的子元素填充剩余空间，
-            // 顺序反了会把 bottom 当填充格吞掉，启动键就悬在中间、底下空一坨
-            dock.Children.Add(new WpfC.Border());
-
-            left.Children.Add(dock);
             return left;
         }
 
@@ -464,18 +491,11 @@ namespace ModPcGUI
 
         private Wpf.FrameworkElement BuildLaunchPage(SolidColorBrush blue, SolidColorBrush text, SolidColorBrush sub)
         {
+            // PCL PageLaunchRight.xaml：MyScrollViewer → StackPanel Margin 25,25,25,10
+            //   PanCustom（本工具的功能卡片）→ MyCard「启动日志」
             var sv = new WpfC.ScrollViewer { VerticalScrollBarVisibility = WpfC.ScrollBarVisibility.Auto };
-            var root = new WpfC.StackPanel { Margin = new Wpf.Thickness(20, 16, 20, 16) };
+            var root = new WpfC.StackPanel { Margin = new Wpf.Thickness(25, 25, 25, 10) };
             sv.Content = root;
-
-            _pageHint = new WpfC.TextBlock
-            {
-                Text = "选择账号并登录，然后启动客户端",
-                FontSize = 11,
-                Foreground = sub,
-                Margin = new Wpf.Thickness(2, 0, 0, 12)
-            };
-            root.Children.Add(_pageHint);
 
             // ---- 卡片：启动设置 ----
             var card = new PCL.MyCard { Title = "启动设置", Margin = new Wpf.Thickness(0, 0, 0, 14) };
@@ -607,7 +627,21 @@ namespace ModPcGUI
             card.Children.Add(sp);
             root.Children.Add(card);
 
-            // 运行日志卡片在「设置」页（BuildSetupPage）
+            // ---- 卡片：启动日志（PCL PageLaunchRight 原版结构：MyCard 内一个只读 MyTextBox）----
+            var logCard = new PCL.MyCard { Title = "启动日志", Margin = new Wpf.Thickness(0, 0, 0, 15) };
+            var logSp = new WpfC.StackPanel { Margin = new Wpf.Thickness(15, 34, 15, 13) };
+            _logBox.Padding = new Wpf.Thickness(0, 4, 0, 4);
+            _logBox.IsReadOnly = true;
+            _logBox.IsUndoEnabled = false;
+            _logBox.AcceptsReturn = true;
+            _logBox.TextWrapping = Wpf.TextWrapping.Wrap;
+            _logBox.BorderThickness = new Wpf.Thickness(0);
+            _logBox.FontSize = 11;
+            _logBox.Height = 220;
+            _logBox.VerticalScrollBarVisibility = WpfC.ScrollBarVisibility.Auto;
+            logSp.Children.Add(_logBox);
+            logCard.Children.Add(logSp);
+            root.Children.Add(logCard);
 
             return sv;
         }
@@ -687,22 +721,12 @@ namespace ModPcGUI
             card.Children.Add(sp);
             root.Children.Add(card);
 
-            // ---- 卡片：运行日志（原「功能」页已删除，日志随诊断一起放在设置页） ----
-            var logCard = new PCL.MyCard { Title = "运行日志", Margin = new Wpf.Thickness(0, 0, 0, 14) };
-            var lsp = new WpfC.StackPanel { Margin = new Wpf.Thickness(15, 35, 15, 15) };
-            _logBox.Height = 150;
-            _logBox.IsReadOnly = true;
-            _logBox.AcceptsReturn = true;
-            _logBox.TextWrapping = Wpf.TextWrapping.NoWrap;
-            _logBox.VerticalScrollBarVisibility = WpfC.ScrollBarVisibility.Auto;
-            _logBox.FontSize = 11;
-            lsp.Children.Add(_logBox);
+            // 运行日志已移到「启动」页（PCL 原版 PageLaunchRight 就是启动日志卡片），
+            // 这里只保留 UID 提示，避免同一个 TextBox 挂两个父容器。
             _uid.FontSize = 10.5;
             _uid.Foreground = sub;
-            _uid.Margin = new Wpf.Thickness(2, 8, 0, 0);
-            lsp.Children.Add(_uid);
-            logCard.Children.Add(lsp);
-            root.Children.Add(logCard);
+            _uid.Margin = new Wpf.Thickness(2, 10, 0, 0);
+            sp.Children.Add(_uid);
 
             return sv;
         }
@@ -1107,7 +1131,9 @@ namespace ModPcGUI
                 if (i >= 0 && i < _accItems.Count) acc = _accItems[i].Name;
             }
             catch { }
-            _launchSub.Text = v + "  ·  " + mode + "  ·  " + acc;
+            // item_ids 为空只是「进某些服没有预加载资源」，不拦启动，跟在文案后面提一句
+            string tail = ItemIdsEmpty() ? "  ·  未配置 item_ids（不影响启动）" : "";
+            _launchSub.Text = v + "  ·  " + mode + "  ·  " + acc + tail;
         }
     }
 }

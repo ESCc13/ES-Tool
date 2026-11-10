@@ -189,12 +189,16 @@ internal class app
 		{
 			why = "还没有设置游戏路径。";
 		}
-		else if (Temp.item_ids == null || Temp.item_ids.Count == 0)
-		{
-			why = "config.json 里的 item_ids 是空的，网易接口取不到资源 id，客户端进不了游戏。";
-		}
 		if (why == null)
 		{
+			// item_ids 为空不再阻断启动：它只决定进服时预加载哪些资源，
+			// 本地图 / 自定义 IP / 联机大厅都能空着跑。
+			// 之前这里直接 return false，表现成「没填 item id 就完全启动不了」，
+			// 比缺资源本身严重得多。
+			if (Temp.item_ids == null || Temp.item_ids.Count == 0)
+			{
+				Term.Warn("未配置 item_ids：仍会启动，但需要预加载资源的服务器可能进不去。");
+			}
 			return true;
 		}
 		if (pendingArgs > 0)
@@ -202,17 +206,17 @@ internal class app
 			int dropped = Term.Discard(pendingArgs, 300);
 			if (dropped < pendingArgs)
 			{
-				Term.WriteLine("（提示：还有 " + (pendingArgs - dropped) + " 行参数没取到，若后续命令错位请重新点一次）");
+				Term.Warn("还有 " + (pendingArgs - dropped) + " 行参数没取到，若后续命令错位请重新点一次。");
 			}
 		}
-		Term.WriteLine("无法启动：" + why);
-		if (why.Contains("item_ids"))
+		Term.Err("无法启动：" + why);
+		if (why.Contains("配置"))
 		{
-			Term.WriteLine("请到「设置 → 编辑 config.json → Item ID 列表」填上资源 id（多个用逗号分隔），保存后即可生效。");
+			Term.Info("请检查启动器目录下的 config.json 是否存在、是否为合法 JSON。");
 		}
 		else
 		{
-			Term.WriteLine("请到「设置」页填好游戏路径并保存。");
+			Term.Info("请到「设置」页填好游戏路径并保存。");
 		}
 		return false;
 	}

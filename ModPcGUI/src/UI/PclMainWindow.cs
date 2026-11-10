@@ -62,15 +62,20 @@ namespace ModPcGUI
 
         private void AppendLog(string s)
         {
-            _logBox.AppendText(s);
+            // GUI 自己拼的消息也走统一日志格式：时时-分分-秒秒 | 级别 | 内容
+            string t = Term.FormatBlock(s);
+            _logBox.AppendText(t);
             _logBox.ScrollToEnd();
-            LogToFile(s);
+            LogToFile(t);
         }
 
         /// <summary>
         /// 同步落盘 run.log。界面日志在「设置」页，用户在「启动」页操作时看不到任何反馈，
         /// 事后也无从查证 —— 登录/下载出问题时这份文件是唯一的现场。
         /// 超过 512 KB 自动重来，避免无限增长。
+        ///
+        /// 注意：传进来的文本已经带「时间 | 级别 |」外壳（Term 输出 / AppendLog 都过了一遍），
+        /// 这里不再加前缀，否则会变成两层时间戳。
         /// </summary>
         private void LogToFile(string s)
         {
@@ -80,8 +85,7 @@ namespace ModPcGUI
                 string f = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "run.log");
                 var fi = new FileInfo(f);
                 if (fi.Exists && fi.Length > 512 * 1024) File.Delete(f);
-                File.AppendAllText(f, "[" + DateTime.Now.ToString("HH:mm:ss") + "] " + s,
-                    System.Text.Encoding.UTF8);
+                File.AppendAllText(f, Term.FormatBlock(s), System.Text.Encoding.UTF8);
             }
             catch { }
         }
@@ -525,21 +529,20 @@ namespace ModPcGUI
         {
             if (!Ready()) return;
 
-            // 启动前先在本地把 config 检查一遍。item_ids 为空时底层命令会直接返回，
-            // 而 3 段参数已经排进输入队列 —— 现象就是「日志看着一切正常，游戏没启动」。
+            // 启动前先在本地把 config 检查一遍：真的没法跑（配置坏了 / 路径错）才拦，
+            // 并且在启动前就把原因说清楚，不用等命令线程跑一遍才发现没反应。
             string block = LaunchBlocker();
             if (block != null)
             {
                 AppendLog("✗ 无法启动：" + block + "\r\n");
-                string tip = block.IndexOf("item_ids", StringComparison.Ordinal) >= 0
-                    ? "在「设置 → 编辑 config.json → Item ID 列表」里填上资源 id（多个用逗号分隔），保存后即可生效。"
-                    : "在「设置」页填好游戏路径并保存。";
                 var r = Wpf.MessageBox.Show(
-                    "无法启动游戏\n\n" + block + "\n\n" + tip + "\n\n现在跳到设置页？",
+                    "无法启动游戏\n\n" + block + "\n\n请在「设置」页检查游戏路径后保存。\n\n现在跳到设置页？",
                     "ES Tool", Wpf.MessageBoxButton.OKCancel, Wpf.MessageBoxImage.Warning);
                 if (r == Wpf.MessageBoxResult.OK) NavTo(SetupPageIndex);
                 return;
             }
+            if (ItemIdsEmpty())
+                AppendLog("⚠ 未配置 item_ids：仍会启动，只是部分服务器可能没有预加载资源。\r\n");
 
             string ip, port;
             if (!SplitAddr(_addrBox.Text, out ip, out port))
@@ -561,6 +564,10 @@ namespace ModPcGUI
         /// <summary>
         /// 启动游戏的本地前置条件。不满足时返回人话原因，满足返回 null。
         /// 判定顺序与底层 app.CheckStart 保持一致，避免两边说法不一样。
+        ///
+        /// 只保留「真的没法启动」的两项：配置读不出来、游戏路径没设置/不存在。
+        /// item_ids 为空不再拦 —— 它只影响进服时要预加载哪些资源，
+        /// 本地图和自定义 IP 空着照样能跑，之前一刀切拦下来等于「没填 id 就完全不能玩」。
         /// </summary>
         private static string LaunchBlocker()
         {
@@ -569,11 +576,21 @@ namespace ModPcGUI
                 var t = text.app.Temp;
                 if (t == null) return "配置没加载成功（config.json 读不出来）";
                 if (string.IsNullOrEmpty(t.path)) return "还没有设置游戏路径";
-                if (t.item_ids == null || t.item_ids.Count == 0) return "config.json 里的 item_ids 是空的";
                 if (!Directory.Exists(t.path)) return "游戏路径不存在：" + t.path;
             }
             catch (Exception ex) { return "读取配置失败：" + ex.Message; }
             return null;
+        }
+
+        /// <summary>item_ids 为空时不算错误，只在启动键下面提一句。</summary>
+        private static bool ItemIdsEmpty()
+        {
+            try
+            {
+                var t = text.app.Temp;
+                return t != null && (t.item_ids == null || t.item_ids.Count == 0);
+            }
+            catch { return false; }
         }
 
         private static bool SplitAddr(string raw, out string ip, out string port)

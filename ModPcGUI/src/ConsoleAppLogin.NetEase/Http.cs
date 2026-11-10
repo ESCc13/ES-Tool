@@ -64,6 +64,58 @@ internal class Http
 
 	public static Thread Thread { get; private set; }
 
+	/// <summary>
+	/// 登录前置：把内层 sauth_json 交给 UniSDK 的 sauth 接口「激活」一次。
+	///
+	/// 网易的 PC 登录链是 uni_sauth → login-otp → authentication-otp。
+	/// 本工具以前跳过了第一步，直接用 cookie 打 login-otp：
+	/// 对网易渠道的账号通常还能过，但 4399 渠道的 session 是没被 sauth 服务认领的，
+	/// login-otp 会稳定返回 code=32（服务器维护中）/ 会话无效，表现就是「4399 账号登不上去」。
+	///
+	/// 这里只在登录前补这一步，失败不阻断（老账号本来就不需要，别把人拦在门外）。
+	/// </summary>
+	public static void UniSauth(string loginOtp)
+	{
+		try
+		{
+			if (string.IsNullOrEmpty(loginOtp)) return;
+			string inner = loginOtp;
+			JObject otp = JsonConvert.DeserializeObject<JObject>(loginOtp);
+			if (otp != null && otp["sauth_json"] != null)
+			{
+				inner = otp["sauth_json"].Type == JTokenType.String
+					? otp["sauth_json"].ToString()
+					: otp["sauth_json"].ToString(Formatting.None);
+			}
+			if (string.IsNullOrEmpty(inner)) return;
+
+			Function.ClientLog("[Login] uni_sauth 请求");
+			using (StringContent content = new StringContent(inner, Encoding.UTF8, "application/json"))
+			using (HttpResponseMessage resp = client.PostAsync("https://mgbsdk.matrix.netease.com/x19/sdk/uni_sauth", content).Result)
+			{
+				string body = resp.Content.ReadAsStringAsync().Result;
+				Function.ClientLog("[Login] uni_sauth " + (int)resp.StatusCode + " " + body);
+				if (!resp.IsSuccessStatusCode)
+				{
+					Term.Warn("[登录] uni_sauth 未通过（HTTP " + (int)resp.StatusCode + "），继续尝试直接登录");
+					return;
+				}
+				try
+				{
+					JObject jo = JsonConvert.DeserializeObject<JObject>(body);
+					int? code = jo?["code"]?.Value<int?>();
+					if (code.HasValue && code.Value != 0 && code.Value != 200)
+						Term.Warn("[登录] uni_sauth 返回 code=" + code.Value + "：" + body);
+				}
+				catch { }
+			}
+		}
+		catch (Exception ex)
+		{
+			Term.Warn("[登录] uni_sauth 跳过：" + ex.Message);
+		}
+	}
+
 	public static void Login(string Login_otp)
 	{
 		if (Thread != null)
@@ -76,6 +128,7 @@ internal class Http
 		}
 		if (Login_otp != null)
 		{
+			UniSauth(Login_otp);
 			Function.ClientLog("[Login] create Login type:x19");
 			string keyStr = string.Empty;
 			LoginotpResposne loginotpResposne = new LoginotpResposne();
