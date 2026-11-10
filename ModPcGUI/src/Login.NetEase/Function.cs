@@ -326,7 +326,11 @@ internal class Function
 		cppGameConfig.skin_info.skin = Directory.GetCurrentDirectory() + "\\steve.png";
 		cppGameConfig.skin_info.md5 = "e5a2e67dba2c2d6bb80817a1c9211036";
 		cppGameConfig.skin_info.skin_iid = "-1";
-		cppGameConfig.misc.auth_server_url = Http.AuthServerUrl;
+		// 认证服改成官方 g79 网关直连（和联机大厅同一条路）。
+		// 原来指向本机代理 Http.AuthServerUrl，客户端会把认证请求发给代理，
+		// 代理再转发给 g79authobt.minecraft.cn —— 那个网关现在对这类请求一律 400 / 空 body，
+		// 客户端拿不到 token，表现就是「一键布吉岛点了没反应 / 进游戏验签失败」。
+		cppGameConfig.misc.auth_server_url = "https://g79authobt.nie.netease.com";
 		cppGameConfig.web_server_url = "https://x19apigatewayobt.nie.netease.com";
 		cppGameConfig.core_server_url = "https://x19obtcore.nie.netease.com:8443";
 		cppGameConfig.world_info.name = "114514";
@@ -353,7 +357,8 @@ internal class Function
 		cppGameConfig.skin_info.skin = Directory.GetCurrentDirectory() + "\\steve.png";
 		cppGameConfig.skin_info.md5 = "e5a2e67dba2c2d6bb80817a1c9211036";
 		cppGameConfig.skin_info.skin_iid = "-1";
-		cppGameConfig.misc.auth_server_url = Http.AuthServerUrl;
+		// 同 FastAUTHgame：认证走官方 g79 网关直连，不再经过本机代理
+		cppGameConfig.misc.auth_server_url = "https://g79authobt.nie.netease.com";
 		cppGameConfig.web_server_url = "https://x19apigatewayobt.nie.netease.com";
 		cppGameConfig.core_server_url = "https://x19obtcore.nie.netease.com:8443";
 		cppGameConfig.world_info.name = "114514";

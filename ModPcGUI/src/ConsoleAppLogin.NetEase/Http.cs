@@ -958,16 +958,22 @@ internal class Http
 			authenticationg80.bit = "64";
 			authenticationg80.clientKey = jObject["clientKey"].ToString();
 			authenticationg80.displayName = app.displayName;
-			authenticationg80.engineVersion = app.Temp.engineVersion;
+			// 版本号必须跟客户端自报的一致。config 里那份 engineVersion 常年不更新
+			// （本机是 3.4.5.272725，客户端实际是 3.10.5.301511），拿旧版本去认证会被网易直接拒掉，
+			// 表现就是「一键布吉岛 / 一键EC」点了之后客户端认证失败、进不去。
+			string clientEngine = jObject["engineVersion"] == null ? null : jObject["engineVersion"].ToString();
+			string clientPatch = jObject["patchVersion"] == null ? null : jObject["patchVersion"].ToString();
+			string clientOs = jObject["os_name"] == null ? null : jObject["os_name"].ToString();
+			authenticationg80.engineVersion = string.IsNullOrEmpty(clientEngine) ? app.Temp.engineVersion : clientEngine;
+			authenticationg80.patchVersion = clientPatch ?? app.Temp.patchVersion;
 			authenticationg80.netease_sid = server_id;
-			authenticationg80.os_name = "android";
-			authenticationg80.patchVersion = app.Temp.patchVersion;
+			authenticationg80.os_name = string.IsNullOrEmpty(clientOs) ? "android" : clientOs;
 			authenticationg80.uid = long.Parse(UID);
 			string text3 = JsonConvert.SerializeObject(authenticationg80);
 			string empty2 = string.Empty;
 			empty2 = ((!Encrypt) ? "/authentication" : "/authentication-v2");
 			CoreNative.ComputeDynamicToken(empty2, text3);
-			text2 = ((!Encrypt) ? HttpPost(empty2, text3, "https://g79authobt.minecraft.cn", out array2) : HttpPost_v2(empty2, text3, "https://g79authobt.minecraft.cn", out array2));
+			text2 = AuthForward(empty2, text3, Encrypt, out array2);
 			Term.WriteLine(text2);
 		}
 		catch (Exception ex)
@@ -983,6 +989,42 @@ internal class Http
 		Term.ForegroundColor = ConsoleColor.Green;
 		Term.WriteLine("接收数据完成:" + text.Trim() + ",时间：" + DateTime.Now.ToString());
 		return array2;
+	}
+
+	/// <summary>
+	/// 把认证请求转发给网易的 g79 网关，返回明文结果，raw 是给客户端原样回传的密文 hex。
+	/// 两个网关轮着试：g79authobt.minecraft.cn 现在对这类代理请求会回 200 + 空 body
+	/// （客户端自己走的是 g79authobt.nie.netease.com，一直可用，联机大厅就是这条线），
+	/// 所以谁先给出非空响应就用谁。
+	/// </summary>
+	private static string AuthForward(string path, string payload, bool encrypt, out string raw)
+	{
+		string[] hosts = { "https://g79authobt.nie.netease.com", "https://g79authobt.minecraft.cn" };
+		string lastRaw = null;
+		string lastErr = null;
+		foreach (string host in hosts)
+		{
+			try
+			{
+				string body;
+				string plain = encrypt ? HttpPost_v2(path, payload, host, out body)
+									   : HttpPost(path, payload, host, out body);
+				if (!string.IsNullOrEmpty(body))
+				{
+					raw = body;
+					return plain;
+				}
+				lastRaw = body;
+				Term.WriteLine("[认证服] " + host + " 返回空响应，换下一个网关重试");
+			}
+			catch (Exception ex)
+			{
+				lastErr = ex.Message;
+				Term.WriteLine("[认证服] " + host + " 失败：" + ex.Message);
+			}
+		}
+		raw = lastRaw;
+		throw new Exception("网易认证网关都没给出响应（" + (lastErr ?? "HTTP 200 但 body 为空") + "）");
 	}
 
 	private static string HandleRequest_v2(HttpListenerRequest request, HttpListenerResponse response, bool Encrypt)
@@ -1137,7 +1179,14 @@ internal class Http
 		httpContent.Headers.Add("user-id", UID);
 		httpClient.DefaultRequestHeaders.Add("User-Agent", "libhttpclient/1.0.0.0");
 		httpClient.DefaultRequestHeaders.ExpectContinue = false;
-		return x19Crypt.HttpDecrypt_g79v12((array = httpClient.PostAsync(host + url, httpContent).Result.Content.ReadAsStringAsync().Result).HexToBytes());
+		array = httpClient.PostAsync(host + url, httpContent).Result.Content.ReadAsStringAsync().Result;
+		// 空 body 直接说清楚。以前这里是 HexToBytes("") → null → 解密函数里 NullReferenceException，
+		// 日志只剩一串堆栈，看不出到底是「网关拒了」还是「网络断了」。
+		if (string.IsNullOrEmpty(array))
+		{
+			throw new Exception("网关 " + host + " 返回空响应（HTTP 200 但没有 body）");
+		}
+		return x19Crypt.HttpDecrypt_g79v12(array.HexToBytes());
 	}
 
 	public static string HttpPost_v2_(string url, string param, string host)

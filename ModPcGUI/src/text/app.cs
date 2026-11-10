@@ -2668,27 +2668,29 @@ internal class app
 				Function.SaveFile(filename, text70);
 				Term.WriteLine("文件已保存");
 			}
-			if (text == "fastbjd")
+			if (text == "fastbjd" || text == "fastec")
 			{
-				if (!Http.IsAuthServer)
+				// 这两条以前没有任何兜底：路径错了 File.WriteAllText 直接抛出去，
+				// 命令线程一死，后面所有命令（包括再点一次）都变成「点了没反应」。
+				bool isBjd = text == "fastbjd";
+				string label = isBjd ? "一键布吉岛" : "一键EC";
+				if (CheckStart(0))
 				{
-					Http.Authserver(11451);
+					try
+					{
+						// 不再起本地认证服：客户端直连 g79authobt.nie.netease.com（与联机大厅同一条路）。
+						// 本地代理那条线（g79authobt.minecraft.cn/authentication-v2）现在稳定返回 400/空 body。
+						Http.server_id = isBjd ? "4638866978460665031:NetworkGame" : "4619956744566574402:NetworkGame";
+						string contents5 = isBjd ? Function.FastAUTHgame() : Function.FastAUTHec();
+						File.WriteAllText(Temp.path + "\\mc.cfg", contents5);
+						Term.WriteLine("✓ " + label + "：服务器 " + Http.server_id + "，认证走官方网关，正在启动客户端…");
+						InvokeCmdAsync("start " + Temp.path + "\\Minecraft.Windows.exe");
+					}
+					catch (Exception ex)
+					{
+						Term.WriteLine("✗ " + label + " 启动失败：" + ex.Message);
+					}
 				}
-				Http.server_id = "4638866978460665031:NetworkGame";
-				string contents5 = Function.FastAUTHgame();
-				File.WriteAllText(Temp.path + "\\mc.cfg", contents5);
-				InvokeCmdAsync("start " + Temp.path + "\\Minecraft.Windows.exe");
-			}
-			if (text == "fastec")
-			{
-				if (!Http.IsAuthServer)
-				{
-					Http.Authserver(11451);
-				}
-				Http.server_id = "4619956744566574402:NetworkGame";
-				string contents6 = Function.FastAUTHec();
-				File.WriteAllText(Temp.path + "\\mc.cfg", contents6);
-				InvokeCmdAsync("start " + Temp.path + "\\Minecraft.Windows.exe");
 			}
 			if (text == "sproom" && (DummySrv.IsInit & (DummySrv.dummyUsers != null)))
 			{
