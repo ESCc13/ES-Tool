@@ -170,6 +170,59 @@ internal class app
 		Term.WriteLine("=============================");
 	}
 
+	/// <summary>
+	/// 启动类命令的统一前置检查。
+	/// 原来这些命令各自写成「路径为空打一行、itemid 为空再打一行」的并列 if，条件不满足时
+	/// 只是多打一行日志就继续往下走（甚至直接跳过），而 GUI 那边已经把整串参数投进了输入队列，
+	/// 没人消费就会串到后续命令上 —— 用户看到的现象就是「日志一切正常，游戏没启动」。
+	/// 这里一次性把「能不能启动」判断清楚，不满足就把排队参数丢掉并返回 false。
+	/// </summary>
+	/// <param name="pendingArgs">GUI 已经排进队列、需要丢弃的参数行数</param>
+	private static bool CheckStart(int pendingArgs)
+	{
+		string why = null;
+		if (Temp == null)
+		{
+			why = "配置没加载成功（config.json 读不出来）。";
+		}
+		else if (string.IsNullOrEmpty(Temp.path))
+		{
+			why = "还没有设置游戏路径。";
+		}
+		else if (Temp.item_ids == null || Temp.item_ids.Count == 0)
+		{
+			why = "config.json 里的 item_ids 是空的，网易接口取不到资源 id，客户端进不了游戏。";
+		}
+		if (why == null)
+		{
+			return true;
+		}
+		if (pendingArgs > 0)
+		{
+			int dropped = Term.Discard(pendingArgs, 300);
+			if (dropped < pendingArgs)
+			{
+				Term.WriteLine("（提示：还有 " + (pendingArgs - dropped) + " 行参数没取到，若后续命令错位请重新点一次）");
+			}
+		}
+		Term.WriteLine("无法启动：" + why);
+		if (why.Contains("item_ids"))
+		{
+			Term.WriteLine("请到「设置 → 编辑 config.json → Item ID 列表」填上资源 id（多个用逗号分隔），保存后即可生效。");
+		}
+		else
+		{
+			Term.WriteLine("请到「设置」页填好游戏路径并保存。");
+		}
+		return false;
+	}
+
+	/// <summary>重新把 config.json 读进 Temp（GUI 改完配置后立即生效，不必重启启动器）。</summary>
+	public static void ReloadConfig()
+	{
+		Temp = JsonConvert.DeserializeObject<temp>(ReadJson("config.json"));
+	}
+
 	public static void Help()
 	{
 		Term.WriteLine("显示该列表 --------------------------- help");
@@ -429,15 +482,7 @@ internal class app
 			}
 			if (text == "ipstart")
 			{
-				if (Temp.path == "")
-				{
-					Term.WriteLine("你还没有设置游戏路径！");
-				}
-				if (Temp.item_ids.Count == 0)
-				{
-					Term.WriteLine("你没有添加itemid！");
-				}
-				else
+				if (CheckStart(0))
 				{
 					try
 					{
@@ -453,47 +498,34 @@ internal class app
 			}
 			if (text == "authstart")
 			{
-				if (Temp.path == "")
+				if (CheckStart(0))
 				{
-					Term.WriteLine("你还没有设置游戏路径！");
-				}
-				if (Temp.item_ids.Count == 0)
-				{
-					Term.WriteLine("你还没有添加itemid！");
-				}
-				if (Http.AuthServerUrl == null)
-				{
-					Term.WriteLine("你还没有启动认证服务器！");
-				}
-				if (Http.server_id == null)
-				{
-					Term.WriteLine("你还没有设置服务器id！");
-				}
-				else
-				{
-					try
+					if (Http.AuthServerUrl == null)
 					{
-						string contents2 = Function.AUTHgame();
-						File.WriteAllText(Temp.path + "\\mc.cfg", contents2);
-						InvokeCmdAsync("start " + Temp.path + "\\Minecraft.Windows.exe");
+						Term.WriteLine("你还没有启动认证服务器！");
 					}
-					catch
+					else if (Http.server_id == null)
 					{
-						Term.WriteLine("路径错误，请检查路径是否存在！");
+						Term.WriteLine("你还没有设置服务器id！");
+					}
+					else
+					{
+						try
+						{
+							string contents2 = Function.AUTHgame();
+							File.WriteAllText(Temp.path + "\\mc.cfg", contents2);
+							InvokeCmdAsync("start " + Temp.path + "\\Minecraft.Windows.exe");
+						}
+						catch
+						{
+							Term.WriteLine("路径错误，请检查路径是否存在！");
+						}
 					}
 				}
 			}
 			if (text == "start")
 			{
-				if (Temp.path == "")
-				{
-					Term.WriteLine("你还没有设置游戏路径！");
-				}
-				if (Temp.item_ids.Count == 0)
-				{
-					Term.WriteLine("你没有添加itemid！");
-				}
-				else
+				if (CheckStart(0))
 				{
 					try
 					{
@@ -1403,31 +1435,41 @@ internal class app
 			}
 			if (text == "gametype")
 			{
-				if (Temp.path == "")
+				if (CheckStart(3))
 				{
-					Term.WriteLine("你还没有设置游戏路径！");
-				}
-				if (Temp.item_ids.Count == 0)
-				{
-					Term.WriteLine("你没有添加itemid！");
-				}
-				else
-				{
+					// 三段参数必须全部读完再判断，否则某一段解析失败时剩下的行会顶到下一条命令上。
+					string aMode = null, aIp = null, aPort = null;
 					try
 					{
 						Term.Write("multiplayer_game_type:");
-						int multiplayer_game_type = int.Parse(Term.ReadLine());
+						aMode = Term.ReadLine();
 						Term.Write("IP:");
-						string ip = Term.ReadLine();
+						aIp = Term.ReadLine();
 						Term.Write("Port:");
-						int port = int.Parse(Term.ReadLine());
-						string contents3 = Function.game_(ip, port, multiplayer_game_type);
-						File.WriteAllText(Temp.path + "\\mc.cfg", contents3);
-						InvokeCmdAsync("start " + Temp.path + "\\Minecraft.Windows.exe");
+						aPort = Term.ReadLine();
 					}
 					catch
 					{
-						Term.WriteLine("路径错误，请检查路径是否存在！");
+						Term.Discard(3, 0);
+					}
+					int multiplayer_game_type, port;
+					if (!int.TryParse(aMode, out multiplayer_game_type) || string.IsNullOrWhiteSpace(aIp)
+						|| !int.TryParse(aPort, out port))
+					{
+						Term.WriteLine("启动参数不完整（应为 模式 / IP / 端口 三段）。");
+					}
+					else
+					{
+						try
+						{
+							string contents3 = Function.game_(aIp.Trim(), port, multiplayer_game_type);
+							File.WriteAllText(Temp.path + "\\mc.cfg", contents3);
+							InvokeCmdAsync("start " + Temp.path + "\\Minecraft.Windows.exe");
+						}
+						catch
+						{
+							Term.WriteLine("路径错误，请检查路径是否存在！");
+						}
 					}
 				}
 			}
@@ -2483,7 +2525,7 @@ internal class app
 			{
 				try
 				{
-					Temp = JsonConvert.DeserializeObject<temp>(ReadJson("config.json"));
+					ReloadConfig();
 				}
 				catch (Exception ex43)
 				{

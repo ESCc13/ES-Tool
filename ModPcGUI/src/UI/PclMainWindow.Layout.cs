@@ -649,7 +649,14 @@ namespace ModPcGUI
                 using (var dlg = new ConfigDialog())
                 {
                     dlg.ShowDialog();
-                    if (dlg.Saved) AppendLog("config.json 已保存，重启后生效\r\n");
+                    if (dlg.Saved)
+                    {
+                        // 改完立刻生效：底层命令和启动页的检查都读 app.Temp，
+                        // 以前只能「重启启动器」，改了 item_ids 也还是点不动启动键。
+                        try { global::text.app.ReloadConfig(); } catch (Exception ex) { AppendLog("✗ 重载配置失败：" + ex.Message + "\r\n"); }
+                        UpdateLaunchCaption();
+                        AppendLog("config.json 已保存并重新载入\r\n");
+                    }
                 }
             };
             var bDiag = new PCL.MyButton { Text = "输出状态到日志", Width = 160, Height = 30 };
@@ -819,6 +826,9 @@ namespace ModPcGUI
 
             // 下载页：首次进入补默认路径并按需拉版本列表（对应 PCL 的 PageLoaded）
             if (idx == DownloadPageIndex) EnsureDownloadPageReady();
+
+            // 启动页：回到这里时重算启动键下面的小字（缺 item_ids / 路径时会显示警告）
+            if (idx == 0) UpdateLaunchCaption();
 
             // 联机大厅：第一次进去且已登录，自动拉一次全服在线地图池，不用先点搜索
             if (idx == 2 && !_lbLoaded && AppHost.Started)
@@ -1068,6 +1078,18 @@ namespace ModPcGUI
         private void UpdateLaunchCaption()
         {
             if (_launchSub == null) return;
+
+            // 前置条件不满足时，直接在启动键下面写清楚缺什么 —— 不用等用户点了才弹窗，
+            // 也就不会出现「日志正常但游戏没起来」这种看不懂的状态。
+            string block = LaunchBlocker();
+            if (block != null)
+            {
+                _launchSub.Text = "⚠ " + block + "  ·  去「设置」处理";
+                _launchSub.Foreground = Brush("#E05A5A");
+                return;
+            }
+            _launchSub.SetResourceReference(WpfC.TextBlock.ForegroundProperty, "ColorBrushGray3");
+
             string v = "1.21.120";
             try { if (text.app.Temp != null && !string.IsNullOrEmpty(text.app.Temp.Version)) v = text.app.Temp.Version; }
             catch { }

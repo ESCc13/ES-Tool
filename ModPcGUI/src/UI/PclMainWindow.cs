@@ -524,6 +524,23 @@ namespace ModPcGUI
         private void DoLaunch()
         {
             if (!Ready()) return;
+
+            // 启动前先在本地把 config 检查一遍。item_ids 为空时底层命令会直接返回，
+            // 而 3 段参数已经排进输入队列 —— 现象就是「日志看着一切正常，游戏没启动」。
+            string block = LaunchBlocker();
+            if (block != null)
+            {
+                AppendLog("✗ 无法启动：" + block + "\r\n");
+                string tip = block.IndexOf("item_ids", StringComparison.Ordinal) >= 0
+                    ? "在「设置 → 编辑 config.json → Item ID 列表」里填上资源 id（多个用逗号分隔），保存后即可生效。"
+                    : "在「设置」页填好游戏路径并保存。";
+                var r = Wpf.MessageBox.Show(
+                    "无法启动游戏\n\n" + block + "\n\n" + tip + "\n\n现在跳到设置页？",
+                    "ES Tool", Wpf.MessageBoxButton.OKCancel, Wpf.MessageBoxImage.Warning);
+                if (r == Wpf.MessageBoxResult.OK) NavTo(SetupPageIndex);
+                return;
+            }
+
             string ip, port;
             if (!SplitAddr(_addrBox.Text, out ip, out port))
             {
@@ -533,10 +550,30 @@ namespace ModPcGUI
             int mode = _typeBox.SelectedIndex == 1 ? 1000 : (_typeBox.SelectedIndex == 2 ? 1 : 100);
             SaveUi();
             AppendLog("› 启动游戏（" + ip + ":" + port + "，模式 " + mode + "）\r\n");
+            // 启动前清掉别的流程残留的输入，避免参数串行
+            Term.ClearInput();
             Term.Submit("gametype");
             Term.Submit(mode.ToString(CultureInfo.InvariantCulture));
             Term.Submit(ip);
             Term.Submit(port);
+        }
+
+        /// <summary>
+        /// 启动游戏的本地前置条件。不满足时返回人话原因，满足返回 null。
+        /// 判定顺序与底层 app.CheckStart 保持一致，避免两边说法不一样。
+        /// </summary>
+        private static string LaunchBlocker()
+        {
+            try
+            {
+                var t = text.app.Temp;
+                if (t == null) return "配置没加载成功（config.json 读不出来）";
+                if (string.IsNullOrEmpty(t.path)) return "还没有设置游戏路径";
+                if (t.item_ids == null || t.item_ids.Count == 0) return "config.json 里的 item_ids 是空的";
+                if (!Directory.Exists(t.path)) return "游戏路径不存在：" + t.path;
+            }
+            catch (Exception ex) { return "读取配置失败：" + ex.Message; }
+            return null;
         }
 
         private static bool SplitAddr(string raw, out string ip, out string port)

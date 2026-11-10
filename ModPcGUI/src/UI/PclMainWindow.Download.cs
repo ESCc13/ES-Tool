@@ -19,6 +19,9 @@ namespace ModPcGUI
         /// <summary>「下载」页在导航里的下标（NavNames：启动 / 下载 / 联机大厅 / 设置 / 更多）</summary>
         internal const int DownloadPageIndex = 1;
 
+        /// <summary>「设置」页在导航里的下标：启动失败时直接跳过去改配置</summary>
+        internal const int SetupPageIndex = 3;
+
         private PCL.MyTextBox _dlPathBox;
         private PCL.MyComboBox _dlVerBox;
         private PCL.MyButton _dlBtn;

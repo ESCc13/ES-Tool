@@ -160,4 +160,22 @@ public static class Term
     {
         while (_queue.TryTake(out _)) { }
     }
+
+    /// <summary>
+    /// 丢掉最多 count 行待处理输入，返回实际丢掉的行数。
+    /// 用于「命令还没读参数就提前退出」的分支：GUI 已经把整串参数投进队列，
+    /// 不消费就会串到后面那条命令上，表现成「点了按钮没反应、日志还一切正常」。
+    /// 首行最多等 waitMs 毫秒（GUI 的多次 Submit 之间可能有时差），之后不再等待。
+    /// </summary>
+    public static int Discard(int count, int waitMs)
+    {
+        int got = 0;
+        while (got < count)
+        {
+            string s;
+            if (_queue.TryTake(out s, got == 0 ? Math.Max(0, waitMs) : 0)) got++;
+            else break;
+        }
+        return got;
+    }
 }
