@@ -195,7 +195,13 @@ internal class app
 			// 本地图 / 自定义 IP / 联机大厅都能空着跑。
 			// 之前这里直接 return false，表现成「没填 item id 就完全启动不了」，
 			// 比缺资源本身严重得多。
-			if (Temp.item_ids == null || Temp.item_ids.Count == 0)
+			if (Temp.item_ids == null)
+			{
+				// config.json 里干脆没这个键时，反序列化出来是 null；
+				// 直接塞进 mc.cfg 会写成 "item_ids": null，客户端读配置就报错。
+				Temp.item_ids = new System.Collections.Generic.List<string>();
+			}
+			if (Temp.item_ids.Count == 0)
 			{
 				Term.Warn("未配置 item_ids：仍会启动，但需要预加载资源的服务器可能进不去。");
 			}
