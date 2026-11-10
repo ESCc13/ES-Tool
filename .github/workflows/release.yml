@@ -143,8 +143,6 @@ jobs:
       - name: 组装可运行包
         shell: pwsh
         run: |
-          # 不关掉进度条的话，Compress-Archive 会在日志里刷几百行
-          $ProgressPreference = 'SilentlyContinue'
           $ver = "${{ steps.ver.outputs.ver }}"
           $rt  = $env:RT
           $bin = "ModPcGUI/src/bin/Release/net48"
@@ -164,10 +162,25 @@ jobs:
             Remove-Item "_pkg/$p" -Recurse -Force -ErrorAction SilentlyContinue
           }
 
-          Copy-Item LICENSE _pkg -Force -ErrorAction SilentlyContinue
-          Copy-Item 免责声明.txt _pkg -Force -ErrorAction SilentlyContinue
-          Copy-Item 更新.txt _pkg -Force -ErrorAction SilentlyContinue
-          Copy-Item README.md _pkg/docs-README.md -Force -ErrorAction SilentlyContinue
+          Write-Host "文件数：$((Get-ChildItem _pkg -Recurse -File).Count)"
+
+      # 说明类文件（含中文名）一律用 bash 拷：PowerShell 5.1 会按 ANSI 解析脚本里的中文，
+      # 文件名变乱码后 Copy-Item 找不到文件，而 -ErrorAction SilentlyContinue 会把它吞掉
+      - name: 补齐说明文件
+        shell: bash
+        run: |
+          for f in LICENSE 免责声明.txt 更新.txt; do
+            if [ -f "$f" ]; then cp -f "$f" _pkg/; echo "已放入 $f"; else echo "跳过缺失的 $f"; fi
+          done
+          if [ -f README.md ]; then cp -f README.md _pkg/docs-README.md; echo "已放入 docs-README.md"; fi
+          ls -l _pkg/*.txt _pkg/LICENSE _pkg/docs-README.md 2>/dev/null || true
+
+      - name: 打包
+        shell: pwsh
+        run: |
+          # 不关掉进度条的话，Compress-Archive 会在日志里刷几百行
+          $ProgressPreference = 'SilentlyContinue'
+          $ver = "${{ steps.ver.outputs.ver }}"
 
           Remove-Item out -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path out | Out-Null

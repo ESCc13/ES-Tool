@@ -1,0 +1,8 @@
+ci: 说明类文件改由 bash 拷入包内
+
+pwsh 5.1 按 ANSI 解析 run 脚本里的中文，Copy-Item 更新.txt / 免责声明.txt
+文件名变乱码后静默跳过（v1.1.2-2 包里就没有 免责声明.txt）。
+
+- 组装：pwsh 只管目录与 DLL
+- 补齐说明文件：bash 拷 LICENSE / 免责声明.txt / 更新.txt / docs-README.md
+- 打包：单独一步，Compress-Archive + sha256
